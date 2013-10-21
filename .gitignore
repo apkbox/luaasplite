@@ -1,3 +1,11 @@
+[Dd]ebug/
+[Rr]elease/
+
+*.user
+*.suo
+*.sdf
+*.ipch
+
 # Compiled Object files
 *.slo
 *.lo
