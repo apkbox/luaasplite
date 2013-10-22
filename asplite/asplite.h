@@ -57,6 +57,7 @@ struct AspPageContext
     void *user_data;
     struct AspEngineConfig engine_config;
     struct {
+        const char *request_method;
         const char *query_string;
     } request;
 };

@@ -54,6 +54,12 @@ asplite.HttpDate = function(t)
 		dt.hour, dt.min, dt.sec);
 end
 
+asplite.ReadEntityBodyMode = {
+	None = 0,
+	Buffered = 1,
+	Bufferless = 2,
+	Classic = 3
+};
 
 asplite.CreateRequestObject = function(variables)
 	local object = {
@@ -61,8 +67,11 @@ asplite.CreateRequestObject = function(variables)
 			queryString_ = asplite.ParseQueryString(variables['QUERY_STRING']);
 			cookies_ = {};
 			form_ = {};
+			files_ = {};
 			serverVariables_ = variables;
 			totalBytes_ = {};
+
+			readEntityBodyMode_ = asplite.ReadEntityBodyMode.None;
 		};
 	};
 
@@ -117,7 +126,23 @@ asplite.CreateRequestObject = function(variables)
 	end
 
 	function object.prototype:getForm_()
+		if self.readEntityBodyMode_ ~= asplite.ReadEntityBodyMode.None and
+				self.readEntityBodyMode_ ~= asplite.ReadEntityBodyMode.Classic then
+			error('entity already read', 2);
+		end
+		self.readEntityBodyMode_ = asplite.ReadEntityBodyMode.Classic;
+		-- asplite.ParseRequestBody();
 		return self.form_;
+	end
+
+	function object.prototype:getFiles_()
+		if self.readEntityBodyMode_ ~= asplite.ReadEntityBodyMode.None and
+				self.readEntityBodyMode_ ~= asplite.ReadEntityBodyMode.Classic then
+			error('entity already read', 2);
+		end
+		self.readEntityBodyMode_ = asplite.ReadEntityBodyMode.Classic;
+		-- asplite.ParseRequestBody();
+		return self.files_;
 	end
 
 	function object.prototype:getQueryString_()
@@ -144,6 +169,9 @@ asplite.CreateRequestObject = function(variables)
 		['Form'] = { 
 			get = object.prototype.getForm_;
 		};
+		['Files'] = { 
+			get = object.prototype.getFiles_;
+		};
 		['QueryString'] = {
 			get = object.prototype.getQueryString_;
 		};
@@ -167,7 +195,7 @@ asplite.CreateRequestObject = function(variables)
 				error('Property is write-only');
 			end
 		else
-			error('Undefined property ' .. k);
+			error('Undefined property ' .. k, 2);
 		end
 	end
 

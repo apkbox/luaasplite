@@ -46,11 +46,7 @@
 #define USE_EMBEDDED_DRIVER
 
 #ifdef USE_EMBEDDED_DRIVER
-#ifdef _WIN64
-#include "asplite_driver_x64.inc"
-#else
-#include "asplite_driver_win32.inc"
-#endif // _WIN64
+#include "asplite_driver.inc"
 #endif // USE_EMBEDDED_DRIVER
 
 
@@ -209,6 +205,7 @@ static struct membuf *GenerateLuaFile(const char *asp_path,
     FILE *fp;
     struct stat asp_file_stat;
     const char *asp_content;
+    const char *asp_content_begin_ptr;
     struct membuf *lua_content;
     size_t estimated_size;
     int lua_fd = -1;
@@ -235,6 +232,13 @@ static struct membuf *GenerateLuaFile(const char *asp_path,
         return NULL;
     }
 
+    // Check for BOM and skip if present
+    asp_content_begin_ptr = asp_content;
+    if (asp_file_stat.st_size >= 3) {
+        if (strncmp(asp_content_begin_ptr, "\xEF\xBB\xBF", 3) == 0)
+            asp_content_begin_ptr += 3;
+    }
+
     if (lua_path != NULL) {
         FILE *lua_fp;
         lua_fp = fopen(lua_path, "wt");
@@ -251,7 +255,7 @@ static struct membuf *GenerateLuaFile(const char *asp_path,
     parser_data.handler = WriteToBufferCallback;
 
     GenerateProlog(parser_data.handler, &parser_data);
-    ParseBuffer(asp_content, asp_file_stat.st_size,
+    ParseBuffer(asp_content_begin_ptr, asp_file_stat.st_size,
             ParserEventHandler, &parser_data);
     GenerateEpilog(parser_data.handler, &parser_data);
 
@@ -434,6 +438,13 @@ void ExeciteAspPage(lua_State *L, const char *asp_page,
     lua_pushstring(L, context->request.query_string);
     lua_settable(L, -3);
 
+    lua_pushstring(L, "HTTP_METHOD");
+    lua_pushstring(L, context->request.request_method);
+    lua_settable(L, -3);
+    lua_pushstring(L, "REQUEST_METHOD");
+    lua_pushstring(L, context->request.request_method);
+    lua_settable(L, -3);
+
     // set context.request field
     lua_settable(L, -3);
 
@@ -457,7 +468,7 @@ void ExeciteAspPage(lua_State *L, const char *asp_page,
 
 #ifdef USE_EMBEDDED_DRIVER
     result = luaL_loadbufferx(L, asplite_Driver, sizeof(asplite_Driver),
-            "asplite_Driver", "b");
+            "asplite_Driver", NULL);
 #else
     result = luaL_loadfile(L, "asplite.lua");
 #endif // USE_EMBEDDED_DRIVER

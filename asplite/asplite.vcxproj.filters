@@ -24,23 +24,14 @@
     <ClCompile Include="generator.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="stdafx.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="luamod.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="asplite.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="platform.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="stdafx.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="parser.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -53,5 +44,8 @@
     <ClInclude Include="generator.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="asplite.lua" />
   </ItemGroup>
 </Project>

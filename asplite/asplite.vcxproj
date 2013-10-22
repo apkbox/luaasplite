@@ -24,20 +24,20 @@
     <ClCompile Include="membuf.c" />
     <ClCompile Include="luamod.c" />
     <ClCompile Include="parser.c" />
-    <ClCompile Include="platform.c" />
-    <ClCompile Include="stdafx.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="asplite.h" />
     <ClInclude Include="generator.h" />
     <ClInclude Include="membuf.h" />
     <ClInclude Include="parser.h" />
-    <ClInclude Include="stdafx.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\lualib\lualib.vcxproj">
       <Project>{be6fdcbb-caf5-4aac-bc64-d2eb43906ad6}</Project>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="asplite.lua" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{5C814481-2796-4169-97F8-16EA8787E411}</ProjectGuid>
@@ -97,6 +97,7 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..;../mongoose/src;../lualib</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>4996</DisableSpecificWarnings>
+      <ForcedIncludeFiles />
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -112,6 +113,7 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..;../mongoose/src;../lualib</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>4996</DisableSpecificWarnings>
+      <ForcedIncludeFiles />
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -129,6 +131,7 @@
       <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..;../mongoose/src;../lualib</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>4996</DisableSpecificWarnings>
+      <ForcedIncludeFiles />
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -148,6 +151,7 @@
       <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..;../mongoose/src;../lualib</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>4996</DisableSpecificWarnings>
+      <ForcedIncludeFiles />
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>

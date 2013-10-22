@@ -55,7 +55,7 @@ args = {};
 
 for i = 1, #arg do
 	local option, value = string.match(arg[i], '^%-(%l):(%d*)');
-	if option then
+	if option and #value > 0 then
 		if option == 'i' then
 			indent = tonumber(value);
 		elseif option == 'n' then
@@ -65,7 +65,7 @@ for i = 1, #arg do
 		end
 	else
 		option, value = string.match(arg[i], '^%-(%l):(.*)');
-		if option then
+		if option and #value > 0 then
 			if option == 'v' and #value then
 				variable_name = value;
 			elseif option == 'c' and #value then
@@ -93,7 +93,7 @@ end
 local template = 'unsigned char ${name}[${size}] = {\n${data}};\n';
 
 if template_file then
-	local tf = io.open(template_file, 'rt');
+	local tf = io.open(template_file, 'r');
 	if not tf then
 		print('error: cannot open template file "' .. template_file .. '".');
 		os.exit(1);
