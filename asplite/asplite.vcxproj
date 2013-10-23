@@ -24,12 +24,16 @@
     <ClCompile Include="membuf.c" />
     <ClCompile Include="luamod.c" />
     <ClCompile Include="parser.c" />
+    <ClCompile Include="str.c" />
+    <ClCompile Include="strlist.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="asplite.h" />
     <ClInclude Include="generator.h" />
     <ClInclude Include="membuf.h" />
     <ClInclude Include="parser.h" />
+    <ClInclude Include="str.h" />
+    <ClInclude Include="strlist.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\lualib\lualib.vcxproj">

@@ -1,135 +1,150 @@
-struct string {
-    size_t capacity;
-    size_t length;
-    char *s;
-};
+// The MIT License (MIT)
+//
+// Copyright (c) 2013 Alex Kozlov
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+// the Software, and to permit persons to whom the Software is furnished to do so,
+// subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+// FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+// COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+// IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+// CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-struct vector {
-    size_t capacity;
-    size_t length;
-    char *arr;
-};
+#include "asplite/str.h"
+
+#include <stdlib.h>
+#include <string.h>
+
+#include "asplite/strlist.h"
 
 
-static struct vector *vector_alloc(struct vector *v, size_t_ len)
+static struct string *string_alloc(struct string *str, size_t len)
 {
-    return realloc(v, sizeof(struct vector) + sizeof(char *) * len);
-}
-
-struct vector *vector_new(size_t reserve)
-{
-    struct vector *v = vector_alloc(NULL, reserve);
-    v->capacity = reserve;
-    v->length = 0;
-    memset(v->arr, 0, sizeof(char *) * len);
-}
-
-
-struct vector *vector_push_back(struct vector *v, char *s)
-{
-    if (v->capacity < v->length + 1)
-        v = vector_alloc(v, v->length + 1);
-        
-    v->arr[v->length++] = s;
-    return v;
-}
-
-
-void vector_delete(struct vector *v)
-{
-    free(v);
+    return realloc(str, sizeof(struct string) + len + 1);
 }
 
 
-static struct string *string_alloc(struct string *s, size_t len)
+static struct string *string_ensure(struct string *str, size_t len)
 {
-    return realloc(s, sizeof(struct string) + len + 1);
+    if (str->capacity < len) {
+        str->capacity += len;
+        str = string_alloc(str, str->capacity);
+    }
+
+    return str;
 }
+
 
 struct string *string_new(size_t len)
 {
-    struct string *s = string_alloc(NULL, len);
-    s->capacity = len;
-    s->length = len;
-    memset(s->s, 0, len);
-    return s;
+    struct string *str = string_alloc(NULL, len);
+    str->capacity = len;
+    str->length = len;
+    memset(str->str, 0, len);
+    return str;
 }
 
-struct string *string_newsz(const char *sz, int len)
+
+struct string *string_new_sz(const char *sz, int len)
 {
     size_t slen = len < 0 ? strlen(sz) : len;
-    struct string *s = string_new(slen);
-    strncpy(s->s, sz, slen);
-    s->s[len] = 0;
-    return s;
+    struct string *str = string_new(slen);
+    strncpy(str->str, sz, slen);
+    str->str[str->length] = 0;
+    return str;
 }
 
 
-struct string *string_dup(const string *s)
+struct string *string_clone(const struct string *str)
 {
-    return string_newsz(s->s, s->length);
+    return string_new_sz(str->str, str->length);
 }
 
-size_t string_length(const struct string *s)
+
+void string_delete(struct string *str)
 {
-    return s->length;
+    free(str);
 }
 
 
-struct string *string_append(struct string *s, const char *sz, size_t len)
+size_t string_length(const struct string *str)
+{
+    return str->length;
+}
+
+
+char *string_get(struct string *str)
+{
+    return str->str;
+}
+
+
+struct string *string_append(struct string *str, const char *sz, int len)
 {
     size_t slen = len < 0 ? strlen(sz) : len;
-    if ((s->capacity - s->size) < len) {
-        s->capacity = s->size + slen;
-        s = string_alloc(s, s->capacity);
+    str = string_ensure(str, str->length + slen);
+    strncat(&str->str[str->length], sz, slen);
+    str->length += slen;
+    return str;
+}
+
+
+struct string *string_unquote(struct string *str, char quote)
+{
+    char *p = str->str;
+
+    if (str->str[0] != quote || str->length < 2)
+        return str;
+
+    if (str->str[0] == str->str[str->length - 1]) {
+        memmove(str->str, &str->str[1], str->length - 2);
+        str->length -= 2;
+        str->str[str->length] = 0;
     }
-    
-    strncat(s->s, sz, slen);
-    return s;
+
+    return str;
 }
 
 
-void string_delete(struct string *s)
+struct strlist *string_split_sz(const char *sz,
+                                const char *delimiters,
+                                int include_empty)
 {
-    free(s);
-}
+    const char *p = sz;
+    struct strlist *list = strlist_new(5);
 
-
-struct vector *str_split_inplace(char *s, const char *sep)
-{
-    char *p = s;
-    struct vector *v = vector_new(5);
-    
     while (*p != '\0') {
-        size_t span = strcspn(p, sep);
+        size_t span = strcspn(p, delimiters);
         if (span == 0) {
+            if (include_empty)
+                strlist_append_sz(list, "", 0);
             p++;
             continue;
         }
 
-        *(p + span) = '\0';
-        vector_push_back(v, p);
-        p = p + span + 1;
+        strlist_append_sz(list, p, span);
+        p += span;
+        if (*p == '\0')
+            break;
+        p++;
     }
 
-    return v;
+    return list;
 }
 
 
-
-// Assumes that leading and trailing whitspace removed
-// including trailing \r\n
-int parseHeaderValue(const char *value)
+struct strlist *string_split(struct string *str,
+                             const char *delimiters,
+                             int include_empty)
 {
-    struct string *tmp = string_newsz(value);
-    struct vector *v = str_split_inplace(tmp->, "; ");
-    
-    // start from 1 since Content-Type: form-data;name="name";filename="filename.txt"
-    for (size_t i = 1; i < v->length; i++) {
-        struct vector *nv = str_split_inplace(v->arr[i], "=");
-        if (nv->length < 2)
-            continue;   // malformed?
-        str_unquote_inplace(nv->arr[1]);
-    }
-
+    return string_split_sz(string_get(str), delimiters, include_empty);
 }

@@ -19,6 +19,10 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+#include "asplite/str.h"
+#include "asplite/strlist.h"
+
+
 void asp_write(void *user_data, const char *text)
 {
     struct AspPageContext *context = (struct AspPageContext *)user_data;
@@ -43,138 +47,210 @@ struct FormItem {
     int is_file;
 };
 
-#if 0
 
-int ProcessMultipartFormData(struct mg_connection *conn,
-        char *directory, struct FormItem *items)
+static char *FindString(char *buf, size_t len,
+        const char *str, size_t str_len)
 {
-    const char *content_type_header, *boundary_start;
-    char buf[MG_BUF_LEN], path[PATH_MAX], fname[1024], boundary[100], *s;
-    FILE *fp;
-    int bl, n, i, j, headers_len, boundary_len, eof,
-        len = 0, num_uploaded_files = 0;
-    int item = 0;
+    char *p;
 
-    // Request looks like this:
-    //
-    // POST /upload HTTP/1.1
-    // Host: 127.0.0.1:8080
-    // Content-Length: 244894
-    // Content-Type: multipart/form-data; boundary=----WebKitFormBoundaryRVr
-    //
-    // ------WebKitFormBoundaryRVr
-    // Content-Disposition: form-data; name="file"; filename="accum.png"
-    // Content-Type: image/png
-    //
-    //  <89>PNG
-    //  <PNG DATA>
-    // ------WebKitFormBoundaryRVr
+    if (len < str_len)
+        return NULL;
 
-    // Extract boundary string from the Content-Type header
-    if ((content_type_header = mg_get_header(conn, "Content-Type")) == NULL ||
-            (boundary_start = mg_strcasestr(content_type_header,
-            "boundary=")) == NULL ||
-            (sscanf(boundary_start, "boundary=\"%99[^\"]\"", boundary) == 0 &&
-            sscanf(boundary_start, "boundary=%99s", boundary) == 0) ||
-            boundary[0] == '\0') {
-        return num_uploaded_files;
-    }
-
-    // Create temporary directory
-    mkdir(directory);
-
-    boundary_len = strlen(boundary);
-    bl = boundary_len + 4;  // \r\n--<boundary>
-    for (;;) {
-        // Pull in headers
-        assert(len >= 0 && len <= (int) sizeof(buf));
-        while ((n = mg_read(conn, buf + len, sizeof(buf)-len)) > 0) {
-            len += n;
-        }
-        if ((headers_len = get_request_len(buf, len)) <= 0) {
-            break;
-        }
-
-        // Fetch file name.
-        fname[0] = '\0';
-        for (i = j = 0; i < headers_len; i++) {
-            if (buf[i] == '\r' && buf[i + 1] == '\n') {
-                buf[i] = buf[i + 1] = '\0';
-                if (strnicmp(&buf[j], "Content-Disposition:", 20) == 0) {
-                    j += 20;
-
-                    p = strstr(&buf[j], "name=");
-                    if (p != NULL) {
-                        p += 5
-
-                        // Unnamed entry - ignore.
-                    }
-
-                }
-                // TODO(lsm): don't expect filename to be the 3rd field,
-                // parse the header properly instead.
-                sscanf(&buf[j], "Content-Disposition: %*s %*s filename=\"%1023[^\"]",
-                    fname);
-                j = i + 2;
-            }
-        }
-
-        // Give up if the headers are not what we expect
-        if (fname[0] == '\0') {
-            break;
-        }
-
-        // Move data to the beginning of the buffer
-        assert(len >= headers_len);
-        memmove(buf, &buf[headers_len], len - headers_len);
-        len -= headers_len;
-
-        // We open the file with exclusive lock held. This guarantee us
-        // there is no other thread can save into the same file simultaneously.
-        fp = NULL;
-        // Construct destination file name. Do not allow paths to have slashes.
-        if ((s = strrchr(fname, '/')) == NULL &&
-            (s = strrchr(fname, '\\')) == NULL) {
-            s = fname;
-        }
-
-        // Open file in binary mode. TODO: set an exclusive lock.
-        snprintf(path, sizeof(path), "%s/%s", tmpdir, s);
-        if ((fp = fopen(path, "wb")) == NULL) {
-            break;
-        }
-
-        // Read POST data, write into file until boundary is found.
-        eof = n = 0;
-        do {
-            len += n;
-            for (i = 0; i < len - bl; i++) {
-                if (!memcmp(&buf[i], "\r\n--", 4) &&
-                    !memcmp(&buf[i + 4], boundary, boundary_len)) {
-                    // Found boundary, that's the end of file data.
-                    fwrite(buf, 1, i, fp);
-                    eof = 1;
-                    memmove(buf, &buf[i + bl], len - (i + bl));
-                    len -= i + bl;
-                    break;
-                }
-            }
-            if (!eof && len > bl) {
-                fwrite(buf, 1, len - bl, fp);
-                memmove(buf, &buf[len - bl], bl);
-                len = bl;
-            }
-        } while (!eof && (n = mg_read(conn, buf + len, sizeof(buf)-len)) > 0);
-        fclose(fp);
-        if (eof) {
-            file_names[num_uploaded_files++] = strdup(path);
+    for (p = buf; p < (buf + (len - str_len)); p++) {
+        if (memcmp(p, str, str_len) == 0) {
+            return p;
         }
     }
 
-    return num_uploaded_files;
+    return NULL;
 }
 
-#endif
+
+static char *FindContent(char *buf, size_t len)
+{
+    return FindString(buf, len, "\r\n\r\n", 4);
+}
+
+
+static int ExtractContentDispositionParameters(const char *data)
+{
+    return 0;
+}
+
+
+static int ExtractContentType(const char *data)
+{
+    return 0;
+}
+
+
+static int ProcessPartHeaders(struct strlist *headers)
+{
+    int i;
+
+    // Go through the headers and find Content-Disposition
+    for (i = 0; i < strlist_size(headers); i++) {
+        struct string *header = strlist_get(headers, i);
+        char *s = string_get(header);
+        if (strncmp(s, "Content-Disposition:", 20) == 0) {
+            s += 20;
+            while (*s == ' ')
+                s++;
+
+            ExtractContentDispositionParameters(s);
+        }
+        else if (strncmp(s, "Content-Type:", 12) == 0) {
+            s += 12;
+            while (*s == ' ')
+                s++;
+
+            ExtractContentType(s);
+        }
+    }
+
+    return 0;
+}
+
+
+static int ProcessMultipartFormData(struct mg_connection *conn,
+                             const char *boundary,
+                             struct string **directory,
+                             struct FormItem *form_items)
+{
+    static const kDefaultBufferSize = 0x4000;
+    size_t buf_size;
+    char *buf = NULL;
+    int len = 0;
+    struct FormItem *current_item = NULL;
+    int form_item_index = 0;
+    struct string *bd = string_new_sz("\r\n--", 4);
+    bd = string_append(bd, boundary, -1);
+
+    buf_size = string_length(bd) < kDefaultBufferSize ?
+            kDefaultBufferSize : string_length(bd) + kDefaultBufferSize;
+
+    buf = malloc(buf_size);
+
+    // The first CRLF was consumed during request parsing,
+    // so we stuff it here artificially.
+    buf[0] = '\r';
+    buf[1] = '\n';
+    len = 2;
+
+    while (1) {
+        char *part;
+        char *content;
+        int read;
+
+        read = mg_read(conn, buf + len, buf_size - len);
+        if (read <= 0 && len == 0)
+            break;
+
+        len += read;
+
+        part = FindString(buf, len, string_get(bd), string_length(bd));
+        if (part != NULL) {
+            if (current_item != NULL && (part - buf) > 0) {
+                // TODO: current_item->Write(buf, part - buf);
+                len -= part - buf;
+                memmove(buf, part, len);
+                continue;   // Fill the buffer.
+            }
+
+            part += string_length(bd);
+
+            // TODO: Check that we have enough data in the buffer
+            if (part[0] == '-' || part[1] == '-')
+                break;   // Closing boundary marker
+
+            if (part[0] != '\r' || part[1] != '\n')
+                break;   // Unexpected.
+
+            part += 2;   // skip CRLF
+
+            content = FindContent(part, len - (part - buf));
+            if (content == NULL)   // Too many headers
+                break;
+
+            current_item = &form_items[form_item_index++];
+
+            if (content > part) {  // Are there headers ?
+                struct strlist *part_headers;
+                // terminate headers part
+                *content = 0;
+                part_headers = string_split_sz(part, "\r\n", 0);
+                ProcessPartHeaders(part_headers);
+                strlist_delete(part_headers);
+            }
+
+            content += 4;  // skip CRLF to content
+
+            len -= content - buf;
+            memmove(buf, content, len);
+        }
+        else {
+            char *possible_boundary = FindString(buf, len, "\r\n", 2);
+            if (possible_boundary == NULL) {
+                // TODO: current_item->Write(buf, len);
+                len = 0;
+            }
+            else {
+                // TODO: current_item->Write(buf, possible_boundary - buf);
+                len -= possible_boundary - buf;
+            }
+        }
+    }
+
+    string_delete(bd);
+    free(buf);
+
+    return 0;
+}
+
+
+// Assumes that leading and trailing whitspace were removed,
+// including trailing CRLF
+int ParseContentTypeHeader(const char *value,
+                           struct string **content_type,
+                           struct string **boundary)
+{
+    int i, found = 0;
+    struct strlist *v = string_split_sz(value, "; ", 0);
+
+    *content_type = NULL;
+    *boundary = NULL;
+
+    if (strlist_size(v) == 0)
+        return 0;
+
+    *content_type = strlist_remove(v, 0);
+
+    for (i = 0; i < strlist_size(v); i++) {
+        struct strlist *name_value_pair = string_split(strlist_get(v, i), "=", 0);
+
+        if (strlist_size(name_value_pair) == 2) {
+            if (strcmp(string_get(strlist_get(name_value_pair, 0)),
+                    "boundary") == 0) {
+                *boundary = string_unquote(
+                        strlist_remove(name_value_pair, 1), '"');
+                strlist_delete(name_value_pair);
+                found = 1;
+                break;
+            }
+        }
+
+        strlist_delete(name_value_pair);
+    }
+
+    if (!found) {
+        string_delete(*content_type);
+        *content_type = NULL;
+    }
+
+    strlist_delete(v);
+    return found;
+}
+
 
 static int handle_asp_request(struct mg_connection *conn, const char *path,
         struct file *filep)
@@ -184,25 +260,43 @@ static int handle_asp_request(struct mg_connection *conn, const char *path,
     int error = 1;
 
     if (strcmp(conn->request_info.request_method, "POST") == 0) {
-        const char *content_type;
-        char boundary[71];   // 70 according to RFC1341
+        const char *content_type_value;
+        struct string *content_type;
+        struct string *boundary;
+        int content_read = 0;
         char buf[1024];
-        content_type = mg_get_header(conn, "Content-Type");
-        if (content_type != NULL) {
-            if (strncmp(content_type, "multipart/form-data", 19) == 0) {
-                // TODO: Process upload
-            }
-            else if (strncmp(content_type, 
-                    "application/x-www-form-urlencoded", 33) == 0) {
-                // TODO: Process form
-            }
-            else {
-                send_http_error(conn, 415, "Unsupported Media Type",
-                        "%s", content_type);
+
+        content_type_value = mg_get_header(conn, "Content-Type");
+        if (content_type_value != NULL) {
+            if (ParseContentTypeHeader(content_type_value, &content_type,
+                    &boundary)) {
+                if (strcmp(string_get(content_type),
+                        "multipart/form-data") == 0) {
+                    struct string *directory;
+                    struct FormItem form_data[64];
+
+                    ProcessMultipartFormData(conn, string_get(boundary),
+                            &directory, form_data);
+                    // TODO: Process upload
+                }
+                else if (strcmp(string_get(content_type),
+                        "application/x-www-form-urlencoded") == 0) {
+                    // TODO: Process form
+                }
+                else {
+                    send_http_error(conn, 415, "Unsupported Media Type",
+                        "%s", content_type_value);
+                }
+
+                string_delete(content_type);
+                string_delete(boundary);
             }
         }
-        while (mg_read(conn, buf, 1024) > 0)
-            ;
+
+        if (!content_read) {
+            while (mg_read(conn, buf, 1024) > 0)
+                ;
+        }
     }
 
     // We need both mg_stat to get file size, and mg_fopen to get fd
