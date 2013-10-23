@@ -72,19 +72,48 @@ static char *FindContent(char *buf, size_t len)
 }
 
 
-static int ExtractContentDispositionParameters(const char *data)
+static int ExtractContentDispositionParameters(const char *data, struct FormItem *item)
 {
-    return 0;
+    size_t i;
+    int result = 0;
+    
+    struct strlist *params = string_split(data, "; ");
+    if (strlist_size(params) > 0) {
+        struct string *disp = strlist_remove(params, 0);
+        if (strcmp(string_get(disp), "form-data") == 0) {
+            for (i = 0; i < strlist_size(params); i++) {
+                struct string *str = strlist_get(params, i);
+                struct strlist *pair = string_split(string_get(str), "=");
+                if (strlist_size(pair) == 2) {
+                    if (strcmp(string_get(strlist_get(pair, 0)), "name") == 0) {
+                        strcpy(item->name, string_get(strlist_get(pair, 1)));
+                    }
+                    else if (strcmp(string_get(strlist_get(pair, 0)), "file") == 0) {
+                        strcpy(item->file_name, string_get(strlist_get(pair, 1)));
+                        item->is_file = 1;
+                    }
+                }
+                strlist_delete(pair);
+            }
+        }
+        else {
+            // unexpected content disposition
+            result = 1;
+        }
+    }
+    else {
+        // no parameters
+        result = 1;
+    }
+    
+    string_delete(disp);
+    strlist_delete(params);
+
+    return result;
 }
 
 
-static int ExtractContentType(const char *data)
-{
-    return 0;
-}
-
-
-static int ProcessPartHeaders(struct strlist *headers)
+static int ProcessPartHeaders(struct strlist *headers, struct FormItem *form_item)
 {
     int i;
 
@@ -97,14 +126,18 @@ static int ProcessPartHeaders(struct strlist *headers)
             while (*s == ' ')
                 s++;
 
-            ExtractContentDispositionParameters(s);
+            ExtractContentDispositionParameters(s, form_item);
         }
         else if (strncmp(s, "Content-Type:", 12) == 0) {
+            struct string *content_type = NULL;
+            struct string *boundary = NULL;
+        
             s += 12;
             while (*s == ' ')
                 s++;
 
-            ExtractContentType(s);
+            // TODO: Make sure content type always returned.
+            ParseContentTypeHeader(s, &content_type, &boundary);
         }
     }
 
@@ -131,7 +164,7 @@ static int ProcessMultipartFormData(struct mg_connection *conn,
 
     buf = malloc(buf_size);
 
-    // The first CRLF was consumed during request parsing,
+    // The first CRLF was consumed during HTTP request parsing,
     // so we stuff it here artificially.
     buf[0] = '\r';
     buf[1] = '\n';
@@ -297,6 +330,14 @@ static int handle_asp_request(struct mg_connection *conn, const char *path,
             while (mg_read(conn, buf, 1024) > 0)
                 ;
         }
+    }
+    else if (strcmp(conn->request_info.request_method, "GET") == 0) {
+        ; // default
+    }
+    else {
+        // TODO: Should send 'Allow: GET, POST' header
+        send_http_error(conn, 405, "Method Not Allowed",
+                "%s method not allowed", conn->request_info.request_method);
     }
 
     // We need both mg_stat to get file size, and mg_fopen to get fd
